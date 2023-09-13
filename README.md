@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img width="160" src="https://github.com/math-ezdev/Android_tip_calculator/assets/97508647/cb93550c-b4ed-4263-b038-823c2f891039">
+  <img height="340" src="https://github.com/math-ezdev/Android_tip_calculator/assets/97508647/c5a91908-cb7d-414a-81de-4f31926a057a">
   &emsp;
   <img  width="160"  src="https://github.com/math-ezdev/Android_tip_calculator/assets/97508647/88f7f9f5-8744-4643-ae10-db143a2a9c5a">
   &emsp;

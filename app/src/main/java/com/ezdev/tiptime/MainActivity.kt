@@ -7,10 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +29,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,37 +40,67 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.text.isDigitsOnly
 import com.ezdev.tiptime.ui.theme.TipTimeTheme
-import java.text.DecimalFormat
+import java.text.NumberFormat
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             TipTimeTheme {
-                TipTimeApp()
+                TipCalculatorApp()
             }
         }
     }
 }
 
-val decimalFormat = DecimalFormat("#.##")
+//  _app
+@Preview(
+    showBackground = true, showSystemUi = true, device = "spec:width=411dp,height=891dp",
 
-@Preview(showBackground = true, showSystemUi = true)
+    )
 @Composable
-fun TipTimeApp() {
-    //  data
-    var isCustomUi by remember { mutableStateOf(true) }
+fun TipCalculatorApp() {
+    //  _data
+    var isCustomUi by remember { mutableStateOf(false) }
+    var billInput by remember { mutableStateOf("") }
+    var tipPercentInput by remember { mutableStateOf("") }
+    var numberOfPeopleInput by remember { mutableStateOf("1") }
 
-    //  ui
-    TipTimeTheme {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            //  switch to change ui
+    val bill = billInput.toFloatOrNull() ?: 0f
+    val tipPercent = tipPercentInput.toFloatOrNull() ?: 0f
+    val numberOfPeople = numberOfPeopleInput.toIntOrNull() ?: 0
+
+    val tip: Float = bill * tipPercent / 100
+    val total: Float = bill + tip
+    val tipPerPerson: Float = if (numberOfPeople > 0) tip / numberOfPeople else 0f
+    val totalPerPerson: Float = if (numberOfPeople > 0) total / numberOfPeople else 0f
+    val resultCalculator = ResultCalculator(
+        tip = NumberFormat.getCurrencyInstance().format(tip),
+        total = NumberFormat.getCurrencyInstance().format(total),
+        tipPerPerson = NumberFormat.getCurrencyInstance().format(tipPerPerson),
+        totalPerPerson = NumberFormat.getCurrencyInstance().format(totalPerPerson)
+    )
+    println("tip percent input = $tipPercentInput")
+    println("tip percent = $tipPercent")
+
+
+    //  _ui
+    TipTimeTheme(darkTheme = false) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            //  _switch
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -84,11 +119,139 @@ fun TipTimeApp() {
                         isCustomUi = !isCustomUi
                     })
             }
-            //  tip calculator
+            //  _app
             if (isCustomUi) {
-                TipCalculator()
+                TipCalculatorCustomUi(
+                    billInput = billInput,
+                    tipPercentInput = tipPercent,
+                    numberOfPeopleInput = numberOfPeople.toFloat(),
+                    onBillChange = {
+                        billInput = it
+                    },
+                    onTipPercentChange = {
+                        tipPercentInput = it.toString()
+                    },
+                    onNumberOfPeopleChange = {
+                        numberOfPeopleInput = it.toInt().toString()
+                    },
+                    tipPercentRange = 0f..100f,
+                    tipPercentSteps = 19,
+                    numberOfPeopleRange = 0f..10f,
+                    numberOfPeopleSteps = 9,
+                    result = resultCalculator,
+                    modifier = Modifier.widthIn(max = 560.dp)
+                )
             } else {
-                TipCalculatorBasic()
+                TipCalculatorBasic(
+                    billInput = billInput,
+                    tipPercentInput = tipPercentInput,
+                    numberOfPeopleInput = numberOfPeopleInput,
+                    onBillChange = {
+                        billInput = it
+                    },
+                    onTipPercentChange = {
+                        tipPercentInput = if (
+                            it.toFloatOrNull() != null && it.toFloat() in 0f..100f
+                        ) {
+                            it
+                        } else {
+                            ""
+                        }
+                    },
+                    onNumberOfPeopleChange = {
+                        numberOfPeopleInput = if (
+                            it.toIntOrNull() != null && it.isDigitsOnly()
+                        ) {
+                            it
+                        } else {
+                            ""
+                        }
+                    },
+                    result = resultCalculator,
+                    modifier = Modifier.widthIn(max = 560.dp)
+                )
+            }
+
+
+        }
+    }
+}
+
+@Composable
+fun TipCalculatorBasic(
+    billInput: String,
+    tipPercentInput: String,
+    numberOfPeopleInput: String,
+    onBillChange: (String) -> Unit,
+    onTipPercentChange: (String) -> Unit,
+    onNumberOfPeopleChange: (String) -> Unit,
+    result: ResultCalculator,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .wrapContentSize()
+            .padding(horizontal = 16.dp, vertical = 80.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        //  _input: TextField
+        NumericTextField(
+            value = billInput, onValueChange = onBillChange, label = "Bill",
+            keyboardOptions = KeyboardOptions.Default.copy(
+                keyboardType = KeyboardType.Decimal,
+                imeAction = ImeAction.Next,
+            )
+        )
+        NumericTextField(
+            value = tipPercentInput, onValueChange = onTipPercentChange, label = "Tip %",
+            keyboardOptions = KeyboardOptions.Default.copy(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Next,
+            )
+        )
+        NumericTextField(
+            value = numberOfPeopleInput,
+            onValueChange = onNumberOfPeopleChange,
+            label = "Number of people",
+            keyboardOptions = KeyboardOptions.Default.copy(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done,
+            )
+        )
+
+        //  _result: Text
+        if (billInput != "" && tipPercentInput != "" && numberOfPeopleInput != "" &&
+            numberOfPeopleInput.toIntOrNull() != null && numberOfPeopleInput.toInt() > 0
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ResultText(tip = result.tip, total = result.total, modifier = Modifier.weight(1f))
+                if (numberOfPeopleInput.toIntOrNull() != null && numberOfPeopleInput.toInt() > 1) {
+                    Divider(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxHeight()
+                            .width(1.dp)
+                            .alpha(0.1f),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    ResultText(
+                        tip = result.tipPerPerson,
+                        total = result.totalPerPerson,
+                        tipText = "Per Person",
+                        totalText = "Per Person",
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -96,26 +259,20 @@ fun TipTimeApp() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TipCalculator(modifier: Modifier = Modifier) {
-    //  data
-    var bill by remember { mutableStateOf("") }
-    var tipPercent by remember { mutableStateOf(0) }
-    var numberOfPeople by remember { mutableStateOf(1) }
-
-    val tipMoney: Float = if (bill != "")
-        bill.toFloat() * tipPercent / 100
-    else 0f
-    val totalAmount: Float = if (bill != "")
-        bill.toFloat() + tipMoney.toInt()
-    else 0f
-    val totalPerPerson: Float = if (bill != "")
-        totalAmount / numberOfPeople
-    else 0f
-    val tipPerPerson: Float = if (bill != "")
-        tipMoney / numberOfPeople
-    else 0f
-
-    //  ui
+fun TipCalculatorCustomUi(
+    billInput: String,
+    tipPercentInput: Float,
+    numberOfPeopleInput: Float,
+    onBillChange: (String) -> Unit,
+    onTipPercentChange: (Float) -> Unit,
+    onNumberOfPeopleChange: (Float) -> Unit,
+    tipPercentRange: ClosedFloatingPointRange<Float>,
+    tipPercentSteps: Int,
+    numberOfPeopleRange: ClosedFloatingPointRange<Float>,
+    numberOfPeopleSteps: Int,
+    result: ResultCalculator,
+    modifier: Modifier = Modifier
+) {
     Card(
         modifier = modifier
             .fillMaxSize()
@@ -131,7 +288,7 @@ fun TipCalculator(modifier: Modifier = Modifier) {
                 .padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
-            //  bill
+            //  _input: TextField + Slider
             Row(
                 modifier = Modifier
                     .wrapContentSize()
@@ -141,120 +298,65 @@ fun TipCalculator(modifier: Modifier = Modifier) {
             ) {
                 Text(text = "Bill")
                 TextField(
-                    value = bill,
+                    value = billInput,
+                    onValueChange = onBillChange,
                     label = {
-                        Text(text = "$")
+                        Text(
+                            text = NumberFormat.getCurrencyInstance(Locale.getDefault()).currency?.symbol
+                                ?: "$"
+                        )
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        containerColor = MaterialTheme.colorScheme.onPrimary,
-                        textColor = MaterialTheme.colorScheme.primary
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Decimal,
+                        imeAction = ImeAction.Done
                     ),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
-                        .widthIn(max = 120.dp),
-                    onValueChange = {
-                        bill = if (it != "")
-                            it
-                        else ""
-                    },
+                        .widthIn(max = 120.dp)
+
                 )
             }
-            //  tip
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Tip")
-                Text(text = "$${decimalFormat.format(tipMoney)}")
-            }
-            Divider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .alpha(0.1f),
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.primary
+            NumericSlider(
+                value = tipPercentInput,
+                onValueChange = onTipPercentChange,
+                valueRange = tipPercentRange,
+                steps = tipPercentSteps,
+                title = "Tip %",
+                valueText = "${tipPercentInput.toInt()} %"
             )
-            //  total amount
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Total Amount")
-                Text(text = "$${decimalFormat.format(totalAmount)}")
-            }
-            //  tip slider
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Tip %")
-                    Text(text = "$tipPercent%")
-                }
-                Slider(
-                    value = tipPercent.toFloat(),
-                    valueRange = 0f..100f,
-                    steps = 19,
-                    onValueChange = {
-                        tipPercent = it.toInt()
-                    })
-            }
-            //  number of people slider
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "No. Of People")
-                    Text(text = "$numberOfPeople")
-                }
-                Slider(value = numberOfPeople.toFloat(),
-                    valueRange = 0f..10f,
-                    steps = 9,
-                    onValueChange = {
-                        println(it)
-                        numberOfPeople = it.toInt()
-                    })
-            }
-            //  share bill
-            if (
-                numberOfPeople > 1 && bill != ""
-            ) {
-                Column(
+            NumericSlider(
+                value = numberOfPeopleInput,
+                onValueChange = onNumberOfPeopleChange,
+                valueRange = numberOfPeopleRange,
+                steps = numberOfPeopleSteps,
+                title = "No. Of People",
+                valueText = "${numberOfPeopleInput.toInt()}"
+            )
+
+            //  _result: Text
+            if (billInput != "" && numberOfPeopleInput > 0) {
+                Divider(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .padding(vertical = 32.dp, horizontal = 16.dp)
-                        .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        .fillMaxWidth()
+                        .alpha(0.1f),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                ResultText(tip = result.tip, total = result.total)
+                if (numberOfPeopleInput > 1) {
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(vertical = 32.dp, horizontal = 16.dp)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(text = "Tip Per Person")
-                        Text(
-                            text = "$${decimalFormat.format(tipPerPerson)}",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "Total Per Person")
-                        Text(
-                            text = "$${decimalFormat.format(totalPerPerson)}",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                        ResultText(
+                            tip = result.tipPerPerson,
+                            total = result.totalPerPerson,
+                            tipText = "Tip Per Person",
+                            totalText = "Total Per Person"
                         )
                     }
                 }
@@ -263,117 +365,110 @@ fun TipCalculator(modifier: Modifier = Modifier) {
     }
 }
 
+//  _data
+data class ResultCalculator(
+    var tip: String,
+    var total: String,
+    var tipPerPerson: String,
+    var totalPerPerson: String
+)
+
+//  _composable
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TipCalculatorBasic(modifier: Modifier = Modifier) {
-    //  data
-    var bill by remember { mutableStateOf("") }
-    var tipPercent by remember { mutableStateOf("") }
-    var numberOfPeople by remember { mutableStateOf("1") }
+fun NumericTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    keyboardOptions: KeyboardOptions,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    colors: TextFieldColors = TextFieldDefaults.outlinedTextFieldColors()
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = {
+            Text(text = label)
+        },
+        keyboardOptions = keyboardOptions,
+        singleLine = singleLine,
+        colors = colors,
+        modifier = modifier,
 
-    val tipMoney: Float = if (bill != "" && tipPercent != "")
-        bill.toFloat() * tipPercent.toFloat() / 100
-    else 0f
-    val totalAmount: Float = if (bill != "" && tipPercent != "")
-        bill.toFloat() + tipMoney.toInt()
-    else 0f
-    val totalPerPerson: Float = if (bill != "" && tipPercent != "" && numberOfPeople != "")
-        totalAmount / numberOfPeople.toInt()
-    else 0f
-    val tipPerPerson: Float = if (bill != "" && tipPercent != "" && numberOfPeople != "")
-        tipMoney / numberOfPeople.toInt()
-    else 0f
+        )
+}
 
-
-    //  ui
+@Composable
+fun ResultText(
+    tip: String,
+    total: String,
+    modifier: Modifier = Modifier,
+    tipText: String = "Tip",
+    totalText: String = "Total",
+    maxLines: Int = 1
+) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .wrapContentSize()
-            .padding(horizontal = 16.dp, vertical = 80.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        OutlinedTextField(
-            value = bill,
-            label = {
-                Text(text = "Bill")
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            singleLine = true,
-            onValueChange = {
-                bill = if (it != "")
-                    it
-                else ""
-            },
-        )
-        OutlinedTextField(
-            value = tipPercent,
-            label = {
-                Text(text = "Tip %")
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            onValueChange = {
-                tipPercent = if (it != "" && it.toFloat() in 1f..100f)
-                    it
-                else ""
-            },
-        )
-        OutlinedTextField(
-            value = numberOfPeople,
-            label = {
-                Text(text = "Number of people")
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            onValueChange = {
-                numberOfPeople = if (it != "" && it.isDigitsOnly() && it.toInt() > 0)
-                    it
-                else ""
-            },
-        )
-        //  tip and total
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Tip = ${decimalFormat.format(tipMoney)}",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "Total amount = ${decimalFormat.format(totalAmount)}",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            //  share bill
-            if (numberOfPeople != "" && numberOfPeople.toInt() > 1) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Per Person = ${decimalFormat.format(tipPerPerson)}",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "Per Person = ${decimalFormat.format(totalPerPerson)}",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            Text(text = tipText)
+            Text(
+                text = tip,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = totalText)
+            Text(
+                text = total,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
     }
 }
+
+@Composable
+fun NumericSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    title: String,
+    valueText: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = title)
+            Text(text = valueText)
+        }
+        Slider(
+            value = value,
+            valueRange = valueRange,
+            steps = steps,
+            onValueChange = onValueChange
+        )
+    }
+}
+
+
